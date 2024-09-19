@@ -5,48 +5,64 @@ import dotenv from "dotenv"
 dotenv.config()
 
 import { db } from "./util/FirebaseInit.js";
-import { collection, getDocs, addDoc } from "firebase/firestore"
+import { collection, getDocs, addDoc, doc, deleteDoc } from "firebase/firestore"
 
-const app = express()
+const app = express();
 const port = 8080;
 
-app.use(express.json())
-app.use(
-	cors({
-		origin: "http://localhost:3000"
-	})
-)
-app.use(bodyParser.urlencoded({ extended: false }))
+// enable CORS for requests from http://localhost:3000
+app.use(cors({
+  origin: "http://localhost:3000",
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", 
+  credentials: true,
+}));
 
-// Create a route at http://localhost:8080/testRoute. You can try it with your browser!
+// middleware
+app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// get all saved cats
 app.get("/", async (req, res) => {
-	res.send("Hello World!");
+    try {
+        const collectionRef = collection(db, "Cats");
+        const collectionSnap = await getDocs(collectionRef);
+        const docs = [];
+        collectionSnap.forEach((doc) => {
+            docs.push({ ...doc.data(), id: doc.id });
+        });
+        res.send(docs);
+    } catch (error) {
+        console.error("Error fetching cats: ", error);
+        res.status(500).send("Error fetching cats");
+    }
 });
 
-// Get all students
-app.get("/students", async (req, res) => {
-	console.log("getting all students")
-	const collectionRef = collection(db, "Students");
-	const collectionSnap = await getDocs(collectionRef)
-	const docs = []
-	collectionSnap.forEach((doc) => {
-		docs.push(doc.data())
-	})
-	res.send(docs)
-})
-
-// Add a new student
-app.post("/students", async (req, res) => {
-	const studentRef = collection(db, "Students");
-	const studentBody = req.body
+// save a cat
+app.post("/", async (req, res) => {
+	const catRef = collection(db, "Cats");
+	const catBody = req.body
 	try {
-		await addDoc(studentRef, studentBody)
+		await addDoc(catRef, catBody)
 	} catch (e) {
 		console.error(e)
 		res.status(500);
 	}
-	res.status(200).send("Succesfully Created Student")
+	console.log("saved cat")
+	res.status(200).send("Succesfully saved cat")
 })
+
+// delete a cat
+app.delete("/:id", async (req, res) => {
+    const catId = req.params.id; // get the cat ID from the URL
+    try {
+        const catRef = doc(db, "Cats", catId); 
+        await deleteDoc(catRef); 
+        res.status(200).send("Cat successfully deleted");
+    } catch (error) {
+        console.error("Error deleting cat: ", error);
+        res.status(500).send("Error deleting cat");
+    }
+});
 
 function start() {
 	app.listen(port, () => {
